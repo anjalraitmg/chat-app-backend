@@ -1,38 +1,31 @@
-from flask import Flask, request
+# backend/app.py - MODIFIED FOR PRODUCTION
+import os
+from flask import Flask
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 
-# Create the Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}) 
 
-# Create Socket.IO server
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Get the frontend URL from an environment variable for security
+# Use a default for local development
+frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
-# --- Socket Events ---
-@socketio.on('connect', namespace='/chat')
+# Make CORS more secure: only allow the frontend to connect
+CORS(app, resources={r"/*": {"origins": frontend_url}})
+socketio = SocketIO(app, cors_allowed_origins=frontend_url)
+
+@socketio.on('connect')
 def handle_connect():
-    client_id = request.sid
-    print(f'🔌 Client connected: {client_id}')
+    print('Client connected!')
 
-@socketio.on('disconnect', namespace='/chat')
+@socketio.on('disconnect')
 def handle_disconnect():
-    client_id = request.sid
-    print(f'❌ Client disconnected: {client_id}')
+    print('Client disconnected!')
 
-@socketio.on('message', namespace='/chat')
+@socketio.on('message')
 def handle_message(data):
-    """Handle chat messages safely"""
-    try:
-        author = data.get("author", "Anonymous")
-        msg = data.get("message", "").strip()
-        if msg:
-            print(f'💬 {author}: {msg}')
-            emit('message', {"author": author, "message": msg}, broadcast=True, namespace='/chat')
-    except Exception as e:
-        print(f"⚠️ Error handling message: {e}")
+    print(f'Received message from {data["author"]}: {data["message"]}')
+    emit('message', data, broadcast=True)
 
-# Run the server
-if __name__ == '__main__':
-    print("🚀 Chat server running on http://localhost:5000")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+# We no longer need the __main__ block for production
+# Gunicorn will run the 'app' object directly
